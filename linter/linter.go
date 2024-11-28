@@ -7,7 +7,7 @@ import (
 	jsonnet "github.com/google/go-jsonnet"
 	"github.com/google/go-jsonnet/ast"
 	"github.com/google/go-jsonnet/internal/errors"
-	"github.com/google/go-jsonnet/internal/parser"
+	"github.com/google/go-jsonnet/parser"
 
 	"github.com/google/go-jsonnet/linter/internal/common"
 	"github.com/google/go-jsonnet/linter/internal/traversal"

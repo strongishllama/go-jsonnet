@@ -20,7 +20,7 @@ package formatter
 
 import (
 	"github.com/google/go-jsonnet/ast"
-	"github.com/google/go-jsonnet/internal/parser"
+	"github.com/google/go-jsonnet/parser"
 	"github.com/google/go-jsonnet/internal/pass"
 )
 

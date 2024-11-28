@@ -37,7 +37,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/setup-go@v2
+      - uses: actions/setup-go@v5
         with:
           go-version: ${{ matrix.goVersion }}
       - run: sudo apt install python3-dev python3-setuptools
@@ -77,11 +77,9 @@ jobs:
       #     version: v1.30.0
       - run: make all
       - name: Install goveralls
-        env:
-          GO111MODULE: off
         run: |
           export GOPATH=$GITHUB_WORKSPACE
-          go get github.com/mattn/goveralls
+          go install github.com/mattn/goveralls@latest
       - name: Send coverage
         env:
           COVERALLS_TOKEN: ${{ secrets.GITHUB_TOKEN }}

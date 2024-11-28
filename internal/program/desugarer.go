@@ -22,7 +22,7 @@ import (
 
 	"github.com/google/go-jsonnet/ast"
 	"github.com/google/go-jsonnet/internal/errors"
-	"github.com/google/go-jsonnet/internal/parser"
+	"github.com/google/go-jsonnet/parser"
 )
 
 var desugaredBop = map[ast.BinaryOp]ast.Identifier{

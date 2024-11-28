@@ -7,7 +7,7 @@ package formatter
 import (
 	"github.com/google/go-jsonnet/ast"
 	"github.com/google/go-jsonnet/internal/formatter"
-	"github.com/google/go-jsonnet/internal/parser"
+	"github.com/google/go-jsonnet/parser"
 )
 
 // StringStyle controls how the reformatter rewrites string literals.
