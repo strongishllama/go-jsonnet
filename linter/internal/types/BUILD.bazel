@@ -16,7 +16,7 @@ go_library(
     visibility = ["//linter:__subpackages__"],
     deps = [
         "//ast:go_default_library",
-        "//internal/parser:go_default_library",
+        "//parser:go_default_library",
         "//linter/internal/common:go_default_library",
     ],
 )
