@@ -24,6 +24,7 @@ import (
 
 	"github.com/google/go-jsonnet/ast"
 	"github.com/google/go-jsonnet/internal/program"
+	"github.com/google/go-jsonnet/internal/syncx"
 )
 
 // An Importer imports data from a path.
@@ -217,7 +218,7 @@ func (cache *importCache) importCode(importedFrom, importedPath string, i *inter
 
 // FileImporter imports data from the filesystem.
 type FileImporter struct {
-	fsCache map[string]*fsCacheEntry
+	fsCache *syncx.Map[string, *fsCacheEntry]
 	JPaths  []string
 }
 
@@ -228,7 +229,7 @@ type fsCacheEntry struct {
 
 func (importer *FileImporter) tryPath(dir, importedPath string) (found bool, contents Contents, foundHere string, err error) {
 	if importer.fsCache == nil {
-		importer.fsCache = make(map[string]*fsCacheEntry)
+		importer.fsCache = &syncx.Map[string, *fsCacheEntry]{}
 	}
 	var absPath string
 	if filepath.IsAbs(importedPath) {
@@ -237,7 +238,7 @@ func (importer *FileImporter) tryPath(dir, importedPath string) (found bool, con
 		absPath = filepath.Join(dir, importedPath)
 	}
 	var entry *fsCacheEntry
-	if cacheEntry, isCached := importer.fsCache[absPath]; isCached {
+	if cacheEntry, isCached := importer.fsCache.Load(absPath); isCached {
 		entry = cacheEntry
 	} else {
 		contentBytes, err := os.ReadFile(absPath)
@@ -255,7 +256,7 @@ func (importer *FileImporter) tryPath(dir, importedPath string) (found bool, con
 				contents: MakeContentsRaw(contentBytes),
 			}
 		}
-		importer.fsCache[absPath] = entry
+		importer.fsCache.Store(absPath, entry)
 	}
 	return entry.exists, entry.contents, absPath, nil
 }
