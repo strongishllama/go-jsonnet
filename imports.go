@@ -17,6 +17,7 @@ limitations under the License.
 package jsonnet
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -24,6 +25,7 @@ import (
 
 	"github.com/google/go-jsonnet/ast"
 	"github.com/google/go-jsonnet/internal/program"
+	"github.com/google/go-jsonnet/internal/syncx"
 )
 
 // An Importer imports data from a path.
@@ -97,9 +99,9 @@ func MakeContentsRaw(bytes []byte) Contents {
 // (i.e. the result of executing the file content).
 // It also verifies that the content pointer is the same for two foundAt values.
 type importCache struct {
-	foundAtVerification map[string]Contents
-	astCache            map[string]ast.Node
-	codeCache           map[string]potentialValue
+	foundAtVerification syncx.Map[string, Contents]
+	astCache            syncx.Map[string, ast.Node]
+	codeCache           syncx.Map[string, potentialValue]
 	importer            Importer
 }
 
@@ -107,14 +109,14 @@ type importCache struct {
 func makeImportCache(importer Importer) *importCache {
 	return &importCache{
 		importer:            importer,
-		foundAtVerification: make(map[string]Contents),
-		astCache:            make(map[string]ast.Node),
-		codeCache:           make(map[string]potentialValue),
+		foundAtVerification: syncx.Map[string, Contents]{},
+		astCache:            syncx.Map[string, ast.Node]{},
+		codeCache:           syncx.Map[string, potentialValue]{},
 	}
 }
 
 func (cache *importCache) flushValueCache() {
-	cache.codeCache = make(map[string]potentialValue)
+	cache.codeCache = syncx.Map[string, potentialValue]{}
 }
 
 func (cache *importCache) importData(importedFrom, importedPath string) (contents Contents, foundAt string, err error) {
@@ -122,12 +124,12 @@ func (cache *importCache) importData(importedFrom, importedPath string) (content
 	if err != nil {
 		return Contents{}, "", err
 	}
-	if cached, importedBefore := cache.foundAtVerification[foundAt]; importedBefore {
-		if cached != contents {
+	if cached, importedBefore := cache.foundAtVerification.Load(foundAt); importedBefore {
+		if !bytes.Equal(cached.Data(), contents.Data()) {
 			panic(fmt.Sprintf("importer problem: a different instance of Contents returned when importing %#v again", foundAt))
 		}
 	} else {
-		cache.foundAtVerification[foundAt] = contents
+		cache.foundAtVerification.Store(foundAt, contents)
 	}
 	return
 }
@@ -137,11 +139,11 @@ func (cache *importCache) importAST(importedFrom, importedPath string) (ast.Node
 	if err != nil {
 		return nil, "", err
 	}
-	if cachedNode, isCached := cache.astCache[foundAt]; isCached {
+	if cachedNode, isCached := cache.astCache.Load(foundAt); isCached {
 		return cachedNode, foundAt, nil
 	}
 	node, err := program.SnippetToAST(ast.DiagnosticFileName(foundAt), foundAt, contents.String())
-	cache.astCache[foundAt] = node
+	cache.astCache.Store(foundAt, node)
 	return node, foundAt, err
 }
 
@@ -197,7 +199,7 @@ func (cache *importCache) importCode(importedFrom, importedPath string, i *inter
 		return nil, i.Error(err.Error())
 	}
 	var pv potentialValue
-	if cachedPV, isCached := cache.codeCache[foundAt]; !isCached {
+	if cachedPV, isCached := cache.codeCache.Load(foundAt); !isCached {
 		// File hasn't been parsed and analyzed before, update the cache record.
 		env := makeInitialEnv(foundAt, i.baseStd)
 		pv = &cachedThunk{
@@ -205,7 +207,7 @@ func (cache *importCache) importCode(importedFrom, importedPath string, i *inter
 			body:    node,
 			content: nil,
 		}
-		cache.codeCache[foundAt] = pv
+		cache.codeCache.Store(foundAt, pv)
 	} else {
 		pv = cachedPV
 	}
@@ -217,7 +219,7 @@ func (cache *importCache) importCode(importedFrom, importedPath string, i *inter
 
 // FileImporter imports data from the filesystem.
 type FileImporter struct {
-	fsCache map[string]*fsCacheEntry
+	fsCache *syncx.Map[string, *fsCacheEntry]
 	JPaths  []string
 }
 
@@ -228,7 +230,7 @@ type fsCacheEntry struct {
 
 func (importer *FileImporter) tryPath(dir, importedPath string) (found bool, contents Contents, foundHere string, err error) {
 	if importer.fsCache == nil {
-		importer.fsCache = make(map[string]*fsCacheEntry)
+		importer.fsCache = &syncx.Map[string, *fsCacheEntry]{}
 	}
 	var absPath string
 	if filepath.IsAbs(importedPath) {
@@ -237,7 +239,7 @@ func (importer *FileImporter) tryPath(dir, importedPath string) (found bool, con
 		absPath = filepath.Join(dir, importedPath)
 	}
 	var entry *fsCacheEntry
-	if cacheEntry, isCached := importer.fsCache[absPath]; isCached {
+	if cacheEntry, isCached := importer.fsCache.Load(absPath); isCached {
 		entry = cacheEntry
 	} else {
 		contentBytes, err := os.ReadFile(absPath)
@@ -255,7 +257,7 @@ func (importer *FileImporter) tryPath(dir, importedPath string) (found bool, con
 				contents: MakeContentsRaw(contentBytes),
 			}
 		}
-		importer.fsCache[absPath] = entry
+		importer.fsCache.Store(absPath, entry)
 	}
 	return entry.exists, entry.contents, absPath, nil
 }

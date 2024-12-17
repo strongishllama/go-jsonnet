@@ -356,18 +356,19 @@ func debugValueToString(v value) string {
 		var sb strings.Builder
 		sb.WriteString("{")
 		firstLine := true
-		for k, v := range i.cache {
-			if k.depth != 0 {
-				continue
+		i.cache.Range(func(key objectCacheKey, value value) bool {
+			if key.depth != 0 {
+				return true
 			}
 			if !firstLine {
 				sb.WriteString(", ")
 				firstLine = true
 			}
-			sb.WriteString(k.field)
+			sb.WriteString(key.field)
 			sb.WriteString(": ")
 			sb.WriteString(debugValueToString(v))
-		}
+			return true
+		})
 		sb.WriteString("}")
 		return sb.String()
 	case *valueArray:
