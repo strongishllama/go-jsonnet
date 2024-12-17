@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"github.com/google/go-jsonnet/ast"
+	"github.com/google/go-jsonnet/internal/syncx"
 )
 
 // value represents a concrete jsonnet value of a specific type.
@@ -425,7 +426,7 @@ func args(xs ...*cachedThunk) callArguments {
 type valueObject struct {
 	valueBase
 	assertionError error
-	cache          map[objectCacheKey]value
+	cache          syncx.Map[objectCacheKey, value]
 	uncached       uncachedObject
 }
 
@@ -592,7 +593,7 @@ func (*simpleObject) inheritanceSize() int {
 
 func makeValueSimpleObject(b bindingFrame, fields simpleObjectFieldMap, asserts []unboundField, locals []objectLocal) *valueObject {
 	return &valueObject{
-		cache: make(map[objectCacheKey]value),
+		cache: syncx.Map[objectCacheKey, value]{},
 		uncached: &simpleObject{
 			upValues: b,
 			fields:   fields,
@@ -643,7 +644,7 @@ func (o *extendedObject) inheritanceSize() int {
 
 func makeValueExtendedObject(left, right *valueObject) *valueObject {
 	return &valueObject{
-		cache: make(map[objectCacheKey]value),
+		cache: syncx.Map[objectCacheKey, value]{},
 		uncached: &extendedObject{
 			left:                 left.uncached,
 			right:                right.uncached,
@@ -714,7 +715,7 @@ func objectIndex(i *interpreter, sb selfBinding, fieldName string) (value, error
 		return nil, i.Error(fmt.Sprintf("Field does not exist: %s", fieldName))
 	}
 
-	if val, ok := sb.self.cache[objectCacheKey{field: fieldName, depth: foundAt}]; ok {
+	if val, ok := sb.self.cache.Load(objectCacheKey{field: fieldName, depth: foundAt}); ok {
 		return val, nil
 	}
 
@@ -724,7 +725,7 @@ func objectIndex(i *interpreter, sb selfBinding, fieldName string) (value, error
 	val, err := field.field.evaluate(i, fieldSelfBinding, fieldUpValues, fieldName)
 
 	if err == nil {
-		sb.self.cache[objectCacheKey{field: fieldName, depth: foundAt}] = val
+		sb.self.cache.Store(objectCacheKey{field: fieldName, depth: foundAt}, val)
 	}
 
 	return val, err
